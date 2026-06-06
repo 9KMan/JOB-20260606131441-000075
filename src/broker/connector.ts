@@ -1,10 +1,27 @@
 import axios, { AxiosInstance } from 'axios';
-import * as bcrypt from 'bcryptjs';
 import { Pool } from 'pg';
-import { OAuthTokenResponse, BrokerTokens } from './types.js';
+import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from 'crypto';
+import { OAuthTokenResponse } from './types';
 
 const TOKEN_ENCRYPTION_KEY = process.env.TOKEN_ENCRYPTION_KEY ?? '';
-const ENCRYPTION_ROUNDS = 12;
+const ALGORITHM = 'aes-256-gcm';
+const KEY_DERIVATION_SALT = 'broker-integration-v1';
+
+/**
+ * Derives a 32-byte AES key from the configured secret using scrypt.
+ * The secret can be a hex string (preferred) or arbitrary passphrase.
+ */
+function deriveKey(secret: string): Buffer {
+  if (!secret) {
+    throw new Error('TOKEN_ENCRYPTION_KEY environment variable not set');
+  }
+  // If user provided a 64-char hex string, use it directly as the key
+  if (/^[0-9a-fA-F]{64}$/.test(secret)) {
+    return Buffer.from(secret, 'hex');
+  }
+  // Otherwise derive via scrypt from the passphrase
+  return scryptSync(secret, KEY_DERIVATION_SALT, 32);
+}
 
 export class BrokerConnector {
   private http: AxiosInstance;
@@ -74,8 +91,8 @@ export class BrokerConnector {
   // ── Token storage ────────────────────────────────────────────────────────
 
   private async storeTokens(response: OAuthTokenResponse): Promise<void> {
-    const encryptedAccess = await this.encrypt(response.access_token);
-    const encryptedRefresh = await this.encrypt(response.refresh_token);
+    const encryptedAccess = this.encrypt(response.access_token);
+    const encryptedRefresh = this.encrypt(response.refresh_token);
     const expiresAt = new Date(Date.now() + response.expires_in * 1000);
 
     await this.db.query(
@@ -105,21 +122,31 @@ export class BrokerConnector {
     await this.storeTokens(response.data);
   }
 
-  private async encrypt(plaintext: string): Promise<string> {
-    if (!TOKEN_ENCRYPTION_KEY) {
-      throw new Error('TOKEN_ENCRYPTION_KEY environment variable not set');
-    }
-    const cipher = await bcrypt.hash(plaintext + TOKEN_ENCRYPTION_KEY, ENCRYPTION_ROUNDS);
-    return cipher;
+  // ── Symmetric encryption (AES-256-GCM) ──────────────────────────────────
+  // Output format: base64(iv || authTag || ciphertext) → 12 + 16 + N bytes
+
+  private encrypt(plaintext: string): string {
+    const key = deriveKey(TOKEN_ENCRYPTION_KEY);
+    const iv = randomBytes(12);
+    const cipher = createCipheriv(ALGORITHM, key, iv);
+    const ciphertext = Buffer.concat([cipher.update(plaintext, 'utf-8'), cipher.final()]);
+    const authTag = cipher.getAuthTag();
+    return Buffer.concat([iv, authTag, ciphertext]).toString('base64');
   }
 
-  private async decrypt(ciphertext: string): Promise<string> {
-    if (!TOKEN_ENCRYPTION_KEY) {
-      throw new Error('TOKEN_ENCRYPTION_KEY environment variable not set');
+  private decrypt(encoded: string): string {
+    const key = deriveKey(TOKEN_ENCRYPTION_KEY);
+    const buf = Buffer.from(encoded, 'base64');
+    if (buf.length < 28) {
+      throw new Error('Encrypted payload is too short to be valid');
     }
-    // bcrypt doesn't support decrypt — use symmetric encryption in production
-    // For demo: store as base64 of XOR with key
-    return Buffer.from(ciphertext, 'base64').toString('utf-8');
+    const iv = buf.subarray(0, 12);
+    const authTag = buf.subarray(12, 28);
+    const ciphertext = buf.subarray(28);
+    const decipher = createDecipheriv(ALGORITHM, key, iv);
+    decipher.setAuthTag(authTag);
+    const plaintext = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
+    return plaintext.toString('utf-8');
   }
 
   /** Load tokens from database on startup */
@@ -134,9 +161,12 @@ export class BrokerConnector {
     }
 
     const row = result.rows[0];
-    this.accessToken = await this.decrypt(row.encrypted_access_token);
-    this.refreshToken = await this.decrypt(row.encrypted_refresh_token);
+    this.accessToken = this.decrypt(row.encrypted_access_token);
+    this.refreshToken = this.decrypt(row.encrypted_refresh_token);
     this.tokenExpiresAt = row.token_expires_at;
     return true;
   }
 }
+
+// Re-export for tests
+export { deriveKey };

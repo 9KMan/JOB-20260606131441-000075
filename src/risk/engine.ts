@@ -1,6 +1,6 @@
 import { Pool } from 'pg';
-import { BreachType, RiskEvent, RiskStatusResponse } from '../broker/types.js';
-import { BrokerRestClient } from '../broker/rest-client.js';
+import { BreachType, RiskEvent } from '../broker/types';
+import { BrokerRestClient } from '../broker/rest-client';
 
 export interface RiskThresholds {
   dailyLossLimit: number;

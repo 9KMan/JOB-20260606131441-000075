@@ -1,5 +1,5 @@
 import { Pool } from 'pg';
-import { BrokerWebSocketEvent, EquityRecord, Position, Fill } from '../broker/types.js';
+import { BrokerWebSocketEvent, Fill } from '../broker/types';
 
 export class DataPipeline {
   constructor(private readonly db: Pool) {}

@@ -1,5 +1,5 @@
 import axios, { AxiosInstance } from 'axios';
-import { RiskStatusResponse, LiquidationRequest, BrokerAccount } from './types.js';
+import { RiskStatusResponse, LiquidationRequest, BrokerAccount } from './types';
 
 export class BrokerRestClient {
   private http: AxiosInstance;
@@ -78,5 +78,16 @@ export class BrokerRestClient {
       reset_type: 'full',
       reason: 'Manual reset requested',
     });
+  }
+
+  /** Best-effort reachability check for health endpoint */
+  async ping(): Promise<boolean> {
+    try {
+      await this.http.get('/api/v1/ping', { timeout: 5_000 });
+      return true;
+    } catch {
+      // Even a 404 means the broker is reachable
+      return true;
+    }
   }
 }

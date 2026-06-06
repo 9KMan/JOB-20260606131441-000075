@@ -1,5 +1,5 @@
 import WebSocket from 'ws';
-import { BrokerWebSocketEvent, BrokerEventType } from './types.js';
+import { BrokerWebSocketEvent, BrokerEventType } from './types';
 
 const BACKOFF_MS = [1000, 2000, 4000, 8000, 16000, 32000, 60000];
 const MAX_BACKOFF_IDX = BACKOFF_MS.length - 1;
@@ -22,8 +22,8 @@ export class BrokerWebSocket {
 
   /** Register handler for a broker event type */
   on<T>(type: BrokerEventType, handler: EventHandler<T>): void {
-    const existing = this.handlers.get(type) as EventHandler<T>[] ?? [];
-    this.handlers.set(type, [...existing, handler]);
+    const existing = this.handlers.get(type) ?? [];
+    this.handlers.set(type, [...existing, handler as EventHandler<unknown>]);
   }
 
   /** Connect to WebSocket and start listening */

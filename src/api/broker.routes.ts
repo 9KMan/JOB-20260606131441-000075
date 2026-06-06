@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
-import { BrokerConnector } from '../broker/connector.js';
-import { BrokerRestClient } from '../broker/rest-client.js';
+import { BrokerConnector } from '../broker/connector';
+import { BrokerRestClient } from '../broker/rest-client';
 
 export function createBrokerRoutes(
   connector: BrokerConnector,
@@ -64,7 +64,7 @@ export function createBrokerRoutes(
       res.status(400).json({ error: 'accountId, reason, breachType required' });
       return;
     }
-    await restClient.triggerLiquidation({ accountId, reason, breachType: breachType as import('../broker/types.js').BreachType });
+    await restClient.triggerLiquidation({ accountId, reason, breachType: breachType as import('../broker/types').BreachType });
     res.json({ success: true });
   });
 

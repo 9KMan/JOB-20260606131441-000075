@@ -1,0 +1,41 @@
+# ─── Worker-internal files (NEVER push to GitHub) ────────────────────────
+SPEC.txt
+TASK.txt
+pid
+role
+worker.log
+.planning/
+
+# ─── Proposal/cover-letter (write to /home/deploy/.hermes/proposals/ only) ─
+PROPOSAL.md
+COVER_LETTER.txt
+
+# ─── Node / TypeScript build output ─────────────────────────────────────
+node_modules/
+dist/
+*.tsbuildinfo
+
+# ─── Environment & secrets ──────────────────────────────────────────────
+.env
+.env.local
+.env.*.local
+
+# ─── Editor / OS noise ──────────────────────────────────────────────────
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# ─── Coverage / test artifacts ──────────────────────────────────────────
+coverage/
+.nyc_output/
+*.lcov
+
+# ─── Logs ───────────────────────────────────────────────────────────────
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
